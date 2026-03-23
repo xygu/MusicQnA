@@ -1,6 +1,6 @@
 # MusicCaps 任务二：SFT + GRPO 流水线说明
 
-**按步骤运行与注意事项**见根目录 [README.md](./README.md)。
+**按步骤运行与注意事项**见根目录 [GUIDE.md](./GUIDE.md)。
 
 面向 **Qwen2.5-Omni Thinker（仅文本输出）** + **MusicCaps**：先 **SFT** 拟合参考描述，再 **GRPO** 用 **aspect 覆盖分** 与 **CLAP 音频–文本对齐分** 做组内相对优化。
 
