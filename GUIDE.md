@@ -65,7 +65,7 @@ cp configs/default.yaml configs/local.yaml
 
 ## 第 3 步：准备音频文件（正式训练必做）
 
-MusicCaps 元数据是 **YouTube id + 起止秒**，你需要自行按合规方式下载并切成约 **10 秒 wav**（本仓库不含下载脚本）。
+MusicCaps 元数据是 **YouTube id + 起止秒**，需按合规方式下载并切成约 **10 秒 wav**。可用 **`scripts/download_musiccaps_wavs.py`**（依赖 `yt-dlp` 与系统 **`ffmpeg`**，见脚本顶部说明）。
 
 **文件命名（与 `scripts/build_manifest.py` 一致）**
 
