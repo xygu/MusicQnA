@@ -1,0 +1,11 @@
+torch>=2.1.0
+transformers>=4.51.0
+accelerate>=0.27.0
+peft>=0.11.0
+datasets>=2.18.0
+soundfile>=0.12.1
+numpy>=1.24.0
+pyyaml>=6.0.1
+tqdm>=4.66.0
+safetensors>=0.4.0
+torchaudio>=2.1.0
