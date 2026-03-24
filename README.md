@@ -89,6 +89,25 @@ python scripts/download_musiccaps_wavs.py \
 
 试跑可加 `--max-clips 5`。若 wav 已由其他合规途径准备好，可跳过本小节，只要命名与上表一致即可。
 
+### A-1. 已有部分 `yt_audio_cache` 时：只切片、不再下载（推荐）
+
+当你已经下载了部分 YouTube 缓存（`./yt_audio_cache`）但不想继续下载时，可直接基于缓存切片：
+
+```bash
+python scripts/slice_musiccaps_from_cache.py \
+  --out-dir ./wavs \
+  --cache-dir ./yt_audio_cache \
+  --workers 8 \
+  --failures-jsonl ./data/slice_from_cache_failures.jsonl
+```
+
+说明：
+
+- 此脚本**不会调用 yt-dlp**，只会用 `ffmpeg` 从现有缓存切片。
+- `missing cache` 表示该 `ytid` 在本地缓存不存在，会被跳过。
+- 若缓存文件损坏（如 `EBML header parsing failed` / `moov atom not found`），该条会记入失败 jsonl，后续可针对性重下。
+- `--workers` 只影响切片并行度（M 系列 Mac 可先试 `8`）。
+
 ### B. 生成 `manifest.jsonl`（使用 MusicCaps 时一般需要）
 
 把 Hub 元数据与本地 wav 对齐为训练用清单（**除非你改用** `examples/mock_manifest.jsonl` **等自备 manifest**）：
@@ -106,6 +125,17 @@ python scripts/build_manifest.py \
 **关于 `export PYTHONPATH="$(pwd)"`**：上述两个脚本都会在内部把仓库根目录加入 `sys.path`，**通常不必**为它们单独设置 `PYTHONPATH`。第 1 步的 `PYTHONPATH` 仍建议保留，供后续 **`python -m musiccaps...`** 使用（未 `pip install -e .` 时）。
 
 然后在 `configs/local.yaml` 里把 **`manifest_path`** 设为该 `musiccaps_manifest.jsonl`。
+
+如果你当前只有部分 wav，可先生成一个部分清单用于先行训练，例如：
+
+```bash
+python scripts/build_manifest.py \
+  --wav-dir ./wavs \
+  --out-jsonl ./data/musiccaps_manifest_partial.jsonl \
+  --require-file
+```
+
+再把 `configs/local.yaml` 的 `manifest_path` 指向 `./data/musiccaps_manifest_partial.jsonl` 即可先开跑。
 
 **注意事项**
 
@@ -175,6 +205,7 @@ python -m musiccaps.train_grpo --config configs/local.yaml
 | SFT | `python -m musiccaps.train_sft --config configs/local.yaml` |
 | GRPO | `python -m musiccaps.train_grpo --config configs/local.yaml` |
 | 下载并切 wav | `python scripts/download_musiccaps_wavs.py --out-dir ./wavs --cache-dir ./yt_audio_cache` |
+| 仅从缓存切片 | `python scripts/slice_musiccaps_from_cache.py --out-dir ./wavs --cache-dir ./yt_audio_cache --workers 8` |
 | 生成 manifest | `python scripts/build_manifest.py --wav-dir ./wavs --out-jsonl ./data/musiccaps_manifest.jsonl --require-file` |
 
 ---
