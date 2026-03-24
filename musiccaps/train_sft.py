@@ -11,6 +11,7 @@ from tqdm import tqdm
 from musiccaps.config import TrainConfig, load_train_config
 from musiccaps.dataset import training_rows
 from musiccaps.lm_backend import build_backend
+from musiccaps.prompts import SYSTEM_OMNI, USER_CAPTION_INSTRUCTION
 
 
 def _seed_everything(seed: int) -> None:
@@ -32,6 +33,16 @@ def main(config_path: str | None = None) -> None:
     cfg = load_train_config(args.config)
     _seed_everything(cfg.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(
+        "[sft] run summary:\n"
+        f"  config={Path(args.config).resolve()}\n"
+        f"  model_id={cfg.model_id}\n"
+        f"  debug_use_mock_model={cfg.debug_use_mock_model}\n"
+        f"  dtype={cfg.dtype} device={device}\n"
+        f"  lora_r={cfg.lora_r} lora_alpha={cfg.lora_alpha} lora_dropout={cfg.lora_dropout}\n"
+        f"  system_prompt={SYSTEM_OMNI}\n"
+        f"  user_prompt={USER_CAPTION_INSTRUCTION}"
+    )
 
     rows = training_rows(cfg)
     if not rows:

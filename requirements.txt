@@ -9,4 +9,5 @@ pyyaml>=6.0.1
 tqdm>=4.66.0
 safetensors>=0.4.0
 torchaudio>=2.1.0
+pillow>=10.0.0
 yt-dlp>=2024.3.10  # scripts/download_musiccaps_wavs.py (also needs ffmpeg on PATH)
