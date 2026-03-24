@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from musiccaps.config import TrainConfig
-from musiccaps.schema import ManifestRow, load_manifest_jsonl, rows_split
+from musiccaps.schema import load_manifest_jsonl, rows_split
 
 
 def load_rows(cfg: TrainConfig) -> list[ManifestRow]:
@@ -16,8 +16,8 @@ def load_rows(cfg: TrainConfig) -> list[ManifestRow]:
     base = mp.parent
     rows = load_manifest_jsonl(mp, base_dir=base)
     if not cfg.debug_use_mock_model:
-        missing_rows: list[ManifestRow] = []
-        existing_rows: list[ManifestRow] = []
+        missing_rows = []
+        existing_rows = []
         for r in rows:
             if r.wav_path.is_file():
                 existing_rows.append(r)
