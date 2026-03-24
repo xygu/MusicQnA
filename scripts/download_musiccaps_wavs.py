@@ -18,6 +18,13 @@ access and process the content.
 - ``yt-dlp`` on ``PATH`` (``pip install yt-dlp``)
 - ``ffmpeg`` on ``PATH`` (system install)
 
+If YouTube or GitHub (EJS scripts) time out, use a local proxy (SOCKS example)::
+
+  export https_proxy=socks5h://127.0.0.1:13659
+  export http_proxy=socks5h://127.0.0.1:13659
+
+Or pass ``--proxy socks5h://127.0.0.1:13659`` / set ``MUSICCAPS_YTDLP_PROXY`` (child ``yt-dlp`` only).
+
 Example::
 
   export PYTHONPATH="$(pwd)"
@@ -25,6 +32,39 @@ Example::
   # export HF_ENDPOINT=https://hf-mirror.com
 
   python scripts/download_musiccaps_wavs.py --out-dir ./wavs --cache-dir ./yt_audio_cache
+
+If YouTube says *Sign in to confirm you're not a bot*, pass cookies from a logged-in browser
+(see `yt-dlp` FAQ)::
+
+  python scripts/download_musiccaps_wavs.py --out-dir ./wavs --cache-dir ./yt_audio_cache \\
+    --cookies-from-browser edge
+
+Or a Netscape-format cookies file::
+
+  python scripts/download_musiccaps_wavs.py ... --cookies ~/youtube_cookies.txt
+
+If ``yt-dlp`` warns about *No supported JavaScript runtime*, install a runtime (e.g. Deno) or
+add e.g. ``--ytdlp-arg --js-runtimes`` and ``--ytdlp-arg node`` per the yt-dlp EJS wiki.
+
+**Homebrew** ``yt-dlp`` often does **not** bundle EJS challenge scripts. If you see *Signature
+solving failed* / *n challenge solving failed* / *Only images are available* even with cookies,
+install **Deno 2+** (``brew install deno``) and fetch scripts from GitHub, e.g.::
+
+  yt-dlp --remote-components ejs:github --no-playlist -f bestaudio/best \\
+    --cookies-from-browser edge "https://www.youtube.com/watch?v=VIDEO_ID"
+
+Or use ``pip install -U "yt-dlp[default]"`` and the ``yt-dlp`` from that environment (includes
+``yt-dlp-ejs``). This script can pass the same GitHub EJS flag via ``--remote-ejs-github``.
+
+If you see *Only images are available* or *Requested format is not available*: without cookies,
+this script defaults to ``youtube:player_client=android,web`` (see
+``--no-default-youtube-extractor-args``). **With** ``--cookies`` / ``--cookies-from-browser``,
+that default is **not** applied—the Android client does not use those cookies, so
+``android,web`` collapses to web-only and often hits the same EJS/signature failures. Use
+cookie-aware ``yt-dlp`` defaults instead, run ``yt-dlp -U``, and see
+https://github.com/yt-dlp/yt-dlp/wiki/EJS . You can also try
+``--ytdlp-arg --extractor-args --ytdlp-arg youtube:player_client=mweb`` (or ``tv``) if suggested
+in current ``yt-dlp`` issues.
 
 Then build the manifest::
 
@@ -35,9 +75,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -68,8 +110,27 @@ def _which_or_exit(name: str) -> str:
     return p
 
 
-def _run(cmd: list[str], *, cwd: Path | None = None) -> None:
-    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+def _ytdlp_cookie_args(*, cookies: Path | None, cookies_from_browser: str | None) -> list[str]:
+    """Prefix args for yt-dlp when using browser or file cookies (YouTube bot challenges)."""
+    if cookies_from_browser is not None:
+        b = cookies_from_browser.strip()
+        if not b:
+            return []
+        return ["--cookies-from-browser", b]
+    if cookies is not None:
+        p = cookies.expanduser().resolve()
+        return ["--cookies", str(p)]
+    return []
+
+
+def _run(
+    cmd: list[str],
+    *,
+    cwd: Path | None = None,
+    env_extra: dict[str, str] | None = None,
+) -> None:
+    run_env = {**os.environ, **env_extra} if env_extra else None
+    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, env=run_env)
     if r.returncode != 0:
         err = (r.stderr or r.stdout or "").strip()
         raise RuntimeError(f"command failed ({r.returncode}): {' '.join(cmd)}\n{err}")
@@ -90,6 +151,7 @@ def _download_video_audio(
     ytid: str,
     cache_dir: Path,
     *,
+    proxy: str | None,
     extra_ytdlp_args: list[str],
 ) -> Path:
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -99,17 +161,25 @@ def _download_video_audio(
 
     url = f"https://www.youtube.com/watch?v={ytid}"
     out_tmpl = str(cache_dir / f"{ytid}.%(ext)s")
-    cmd = [
-        yt_dlp,
-        "--no-playlist",
-        "-f",
-        "bestaudio/best",
-        "-o",
-        out_tmpl,
-        *extra_ytdlp_args,
-        url,
-    ]
-    _run(cmd)
+    cmd: list[str] = [yt_dlp, "--no-playlist"]
+    if proxy:
+        cmd.extend(["--proxy", proxy])
+    cmd.extend(
+        [
+            "-f",
+            "bestaudio/best",
+            "-o",
+            out_tmpl,
+            *extra_ytdlp_args,
+            url,
+        ]
+    )
+    env_extra: dict[str, str] | None = None
+    if proxy:
+        env_extra = {}
+        for k in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+            env_extra.setdefault(k, proxy)
+    _run(cmd, env_extra=env_extra)
     found = _cached_media_path(cache_dir, ytid)
     if found is None:
         raise RuntimeError(f"yt-dlp finished but no media file found for ytid={ytid}")
@@ -194,6 +264,13 @@ def main() -> None:
         help="Comma-separated: train,valid,test (HF split names mapped like build_manifest). Empty = all.",
     )
     ap.add_argument("--max-clips", type=int, default=None, help="Stop after this many dataset rows (debug).")
+    ap.add_argument(
+        "--download-retries",
+        type=int,
+        default=5,
+        metavar="N",
+        help="Per-video yt-dlp attempts when a download errors (helps SOCKS IncompleteRead). Default: 5.",
+    )
     ap.add_argument("--workers", type=int, default=4, help="Parallel ffmpeg slice jobs.")
     ap.add_argument("--sample-rate", type=int, default=48000)
     ap.add_argument("--mono", action="store_true", help="Output mono wav (default: stereo).")
@@ -201,6 +278,43 @@ def main() -> None:
         "--no-skip-existing",
         action="store_true",
         help="Re-slice even if the output wav already exists.",
+    )
+    yc = ap.add_mutually_exclusive_group()
+    yc.add_argument(
+        "--cookies",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help="Netscape-format cookies file for yt-dlp (fixes many 'Sign in to confirm you're not a bot' errors).",
+    )
+    yc.add_argument(
+        "--cookies-from-browser",
+        type=str,
+        default=None,
+        metavar="BROWSER",
+        help="yt-dlp --cookies-from-browser BROWSER (e.g. edge, chrome, safari, firefox).",
+    )
+    ap.add_argument(
+        "--no-default-youtube-extractor-args",
+        action="store_true",
+        help="Do not pass youtube:player_client=android,web when not using cookies (ignored with --cookies / --cookies-from-browser).",
+    )
+    ap.add_argument(
+        "--remote-ejs-github",
+        action="store_true",
+        help="Pass --remote-components ejs:github (needed for many Homebrew yt-dlp installs; install Deno 2+).",
+    )
+    ap.add_argument(
+        "--proxy",
+        type=str,
+        default=None,
+        metavar="URL",
+        help="yt-dlp --proxy URL (e.g. socks5h://127.0.0.1:13659). Default: env MUSICCAPS_YTDLP_PROXY if set.",
+    )
+    ap.add_argument(
+        "--no-ytdlp-robust-socks",
+        action="store_true",
+        help="When using --proxy, do not add socket-timeout/retries (default adds them for flaky SOCKS).",
     )
     ap.add_argument(
         "--ytdlp-arg",
@@ -221,6 +335,34 @@ def main() -> None:
     cache_dir = args.cache_dir.resolve()
     yt_dlp = _which_or_exit("yt-dlp")
     ffmpeg = _which_or_exit("ffmpeg")
+
+    cookie_prefix = _ytdlp_cookie_args(
+        cookies=args.cookies,
+        cookies_from_browser=args.cookies_from_browser,
+    )
+    if args.cookies is not None and not args.cookies.expanduser().resolve().is_file():
+        print(f"error: --cookies file not found: {args.cookies}", file=sys.stderr)
+        sys.exit(1)
+    youtube_client_args: list[str] = []
+    # android client does not use browser cookies; android,web + cookies => web-only => often broken EJS.
+    if not args.no_default_youtube_extractor_args and not cookie_prefix:
+        youtube_client_args = ["--extractor-args", "youtube:player_client=android,web"]
+    ejs_remote: list[str] = []
+    if args.remote_ejs_github:
+        ejs_remote = ["--remote-components", "ejs:github"]
+
+    ytdlp_proxy = (args.proxy or os.environ.get("MUSICCAPS_YTDLP_PROXY", "").strip()) or None
+    ytdlp_robust: list[str] = []
+    if ytdlp_proxy and not args.no_ytdlp_robust_socks:
+        ytdlp_robust = ["--socket-timeout", "120", "--retries", "10", "--fragment-retries", "10"]
+
+    ytdlp_extra = [
+        *cookie_prefix,
+        *ejs_remote,
+        *ytdlp_robust,
+        *youtube_client_args,
+        *list(args.ytdlp_arg),
+    ]
 
     only_splits: set[str] | None = None
     if args.splits.strip():
@@ -253,6 +395,10 @@ def main() -> None:
     # Resolve cache paths per ytid (download sequential to reduce throttling)
     ytid_to_src: dict[str, Path] = {}
     failures: list[dict[str, Any]] = []
+    if ytdlp_proxy:
+        print(f"yt-dlp --proxy {ytdlp_proxy}")
+    if ytdlp_robust:
+        print("yt-dlp: --socket-timeout 120 --retries 10 --fragment-retries 10 (default with --proxy)")
     print(f"Unique videos: {len(by_ytid)}; clips needed: {n_need_clips} (skipped existing: {n_skipped})")
 
     for i, ytid in enumerate(sorted(by_ytid.keys()), start=1):
@@ -264,26 +410,36 @@ def main() -> None:
             break
         if not need_any:
             continue
-        try:
-            ytid_to_src[ytid] = _download_video_audio(
-                yt_dlp, ytid, cache_dir, extra_ytdlp_args=list(args.ytdlp_arg)
-            )
-            print(f"[{i}/{len(by_ytid)}] cached audio ytid={ytid} -> {ytid_to_src[ytid].name}")
-        except Exception as e:
-            msg = str(e)
-            print(f"[{i}/{len(by_ytid)}] download failed ytid={ytid}: {msg}", file=sys.stderr)
-            for start_s, end_s, out_wav in by_ytid[ytid]:
-                if skip_existing and out_wav.is_file():
-                    continue
-                failures.append(
-                    {
-                        "ytid": ytid,
-                        "start_s": start_s,
-                        "end_s": end_s,
-                        "stage": "download",
-                        "error": msg,
-                    }
+        n_vid_retries = max(1, int(args.download_retries))
+        for attempt in range(1, n_vid_retries + 1):
+            try:
+                ytid_to_src[ytid] = _download_video_audio(
+                    yt_dlp, ytid, cache_dir, proxy=ytdlp_proxy, extra_ytdlp_args=ytdlp_extra
                 )
+                print(f"[{i}/{len(by_ytid)}] cached audio ytid={ytid} -> {ytid_to_src[ytid].name}")
+                break
+            except Exception as e:
+                if attempt < n_vid_retries:
+                    print(
+                        f"[{i}/{len(by_ytid)}] download attempt {attempt} failed ytid={ytid}, retrying: {e}",
+                        file=sys.stderr,
+                    )
+                    time.sleep(min(30.0, 3.0 * attempt))
+                    continue
+                msg = str(e)
+                print(f"[{i}/{len(by_ytid)}] download failed ytid={ytid}: {msg}", file=sys.stderr)
+                for start_s, end_s, out_wav in by_ytid[ytid]:
+                    if skip_existing and out_wav.is_file():
+                        continue
+                    failures.append(
+                        {
+                            "ytid": ytid,
+                            "start_s": start_s,
+                            "end_s": end_s,
+                            "stage": "download",
+                            "error": msg,
+                        }
+                    )
 
     jobs: list[tuple[str, Path, int, int, Path]] = []
     for ytid, clips in by_ytid.items():

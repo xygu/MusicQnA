@@ -1,1 +1,4 @@
 *.pyc
+.yt_dlp_smoke/
+yt_audio_cache/
+wavs/
