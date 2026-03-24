@@ -5,3 +5,5 @@ yt_audio_cache/
 yt_audio_cache/
 wavs/
 logs/full_download.log
+nohup.out
+checkpoints/

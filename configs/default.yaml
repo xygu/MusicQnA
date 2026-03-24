@@ -21,7 +21,7 @@ lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_p
 manifest_path: "./data/musiccaps_manifest.jsonl"
 max_samples: null
 # true: skip rows whose wav files are missing; false: fail fast with FileNotFoundError
-skip_missing_wavs: true
+skip_missing_wavs: false
 
 # --- SFT ---
 sft_epochs: 1
