@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/mindopt/qq-env/qa/lib/python3.9/runpy.py", line 197, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/mindopt/qq-env/qa/lib/python3.9/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/mindopt/gxy/qa/musiccaps/train_sft.py", line 74, in <module>
+    main()
+  File "/mindopt/gxy/qa/musiccaps/train_sft.py", line 36, in main
+    rows = training_rows(cfg)
+  File "/mindopt/gxy/qa/musiccaps/dataset.py", line 28, in training_rows
+    return rows_split(load_rows(cfg), "train")
+  File "/mindopt/gxy/qa/musiccaps/dataset.py", line 21, in load_rows
+    raise FileNotFoundError(f"Missing wav for id={r.id}: {r.wav_path}")
+FileNotFoundError: Missing wav for id=-0Gj8-vB1q4_30_40: /Users/xinyue/work/03_code/QA/musiccaps_pipeline/wavs/-0Gj8-vB1q4_30_40.wav
