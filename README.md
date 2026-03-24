@@ -152,7 +152,7 @@ python scripts/build_manifest.py \
 
 ```bash
 export PYTHONPATH="$(pwd)"
-python -m musiccaps.train_sft --config configs/local.yaml
+python -m musiccaps.train_sft --config configs/default.yaml
 # 等价：python -m musiccaps sft --config configs/local.yaml
 ```
 
