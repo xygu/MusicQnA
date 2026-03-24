@@ -2,3 +2,4 @@
 .yt_dlp_smoke/
 yt_audio_cache/
 wavs/
+logs/full_download.log
