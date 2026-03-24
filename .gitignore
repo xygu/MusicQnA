@@ -1,1 +1,3 @@
 *.pyc
+wavs/
+yt_audio_cache/
