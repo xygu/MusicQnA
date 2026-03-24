@@ -9,7 +9,7 @@ model_id: "Qwen/Qwen2.5-Omni-3B"
 dtype: "bfloat16"
 
 # Debug: no GPU / no multimodal deps — uses tiny GPT2 + text-only chats (pipeline smoke test)
-debug_use_mock_model: false
+debug_use_mock_model: true
 
 # --- LoRA (SFT & GRPO trainable adapter); set r: 0 to disable ---
 lora_r: 16

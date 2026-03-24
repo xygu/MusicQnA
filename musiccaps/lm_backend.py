@@ -52,7 +52,9 @@ class CaptionLMBackend(ABC):
         if not path.is_dir():
             raise FileNotFoundError(f"Adapter checkpoint not found: {path}")
         if isinstance(self.model, PeftModel):
-            self.model.load_adapter(str(path))
+            # PEFT >= 0.12 requires adapter_name. "default" matches get_peft_model(); when it
+            # already exists, load_adapter only applies weights (see peft PeftModel.load_adapter).
+            self.model.load_adapter(str(path), adapter_name="default", is_trainable=True)
             return
         raise TypeError("load_adapter_checkpoint only supported for PEFT-wrapped models")
 

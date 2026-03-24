@@ -7,3 +7,4 @@ wavs/
 logs/full_download.log
 nohup.out
 checkpoints/
+*.log
