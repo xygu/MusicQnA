@@ -33,7 +33,7 @@ class ClapScorer:
         if len(wav_paths) != len(texts):
             raise ValueError("wav_paths and texts length mismatch")
         scores: list[float] = []
-        for p, text in zip(wav_paths, texts, strict=True):
+        for p, text in zip(wav_paths, texts):
             w, sr = _mono_float32(p)
             if sr != self.target_sr:
                 t = torch.from_numpy(w).float().unsqueeze(0)

@@ -49,10 +49,13 @@ def combine_rewards(
     w_sum = w_asp + w_clap
     if w_sum <= 0:
         raise ValueError("reward weights must sum to > 0")
-    return [
-        (w_asp * a + w_clap * c) / w_sum
-        for a, c in zip(aspect_scores, clap_scores, strict=True)
-    ]
+    asp = list(aspect_scores)
+    clp = list(clap_scores)
+    if len(asp) != len(clp):
+        raise ValueError(
+            f"aspect_scores and clap_scores length mismatch: {len(asp)} vs {len(clp)}"
+        )
+    return [(w_asp * a + w_clap * c) / w_sum for a, c in zip(asp, clp)]
 
 
 def group_advantages(rewards: Sequence[float], eps: float = 1e-8) -> list[float]:
