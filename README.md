@@ -142,6 +142,7 @@ python scripts/build_manifest.py \
 - 注意 **版权与平台服务条款**；MusicCaps 也有数据许可说明，商用前请自行核对。
 - 命名必须与 `default_wav_name` 一致，否则 `build_manifest --require-file` 会大量跳过。
 - **`--require-file`**：只写入**磁盘上真实存在**的 wav，避免训练时才报错；首次对齐数据时强烈建议打开。
+- 若仍希望训练阶段容错跳过缺失音频，可在配置中设 **`skip_missing_wavs: true`**（默认 `false`，即缺失即报错）。
 - **split 字段**：脚本会按 HuggingFace 数据集上的 **split 名**（如 `train` / `test`）以及行内 `split` 字段（若有）映射到 `train` / `valid` / `test`。训练脚本**当前只读 `split=train`**，请确认 manifest 里训练集行是 `train`。
 - **依赖**：需要 `datasets` 且能访问 Hub（或镜像）以下载 `google/MusicCaps` 元数据。
 

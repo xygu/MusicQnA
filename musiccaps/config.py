@@ -30,6 +30,7 @@ class TrainConfig:
 
     manifest_path: str = "./data/musiccaps_manifest.jsonl"
     max_samples: Optional[int] = None
+    skip_missing_wavs: bool = False
 
     sft_epochs: int = 1
     sft_batch_size: int = 1
